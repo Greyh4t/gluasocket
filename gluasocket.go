@@ -93,7 +93,6 @@ func read(L *lua.LState) int {
 	s := checkSocket(L)
 	s.conn.SetReadDeadline(time.Now().Add(s.timeout))
 	buf, err := ioutil.ReadAll(s.conn)
-	s.conn.SetReadDeadline(time.Time{})
 	if err != nil {
 		L.Push(lua.LNil)
 		L.Push(lua.LString(err.Error()))
@@ -109,7 +108,6 @@ func readN(L *lua.LState) int {
 	buf := make([]byte, n)
 	s.conn.SetReadDeadline(time.Now().Add(s.timeout))
 	_, err := s.conn.Read(buf)
-	s.conn.SetReadDeadline(time.Time{})
 	if err != nil {
 		L.Push(lua.LNil)
 		L.Push(lua.LString(err.Error()))
