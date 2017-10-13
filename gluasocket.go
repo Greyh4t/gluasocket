@@ -66,13 +66,11 @@ func connect(L *lua.LState) int {
 	addr := L.CheckString(2) + ":" + strconv.Itoa(L.CheckInt(3))
 	conn, err := net.DialTimeout(s.t, addr, s.timeout)
 	if err != nil {
-		L.Push(lua.LBool(false))
 		L.Push(lua.LString(err.Error()))
-		return 2
+		return 1
 	}
 	s.conn = conn
-	L.Push(lua.LBool(true))
-	return 1
+	return 0
 }
 
 func send(L *lua.LState) int {
@@ -80,12 +78,11 @@ func send(L *lua.LState) int {
 	s.conn.SetWriteDeadline(time.Now().Add(s.timeout))
 	n, err := s.conn.Write([]byte(L.CheckString(2)))
 	s.conn.SetWriteDeadline(time.Time{})
+	L.Push(lua.LNumber(n))
 	if err != nil {
-		L.Push(lua.LNil)
 		L.Push(lua.LString(err.Error()))
 		return 2
 	}
-	L.Push(lua.LNumber(n))
 	return 1
 }
 
@@ -93,27 +90,25 @@ func read(L *lua.LState) int {
 	s := checkSocket(L)
 	s.conn.SetReadDeadline(time.Now().Add(s.timeout))
 	buf, err := ioutil.ReadAll(s.conn)
+	L.Push(lua.LString(string(buf)))
 	if err != nil {
-		L.Push(lua.LNil)
 		L.Push(lua.LString(err.Error()))
 		return 2
 	}
-	L.Push(lua.LString(string(buf)))
 	return 1
 }
 
 func readN(L *lua.LState) int {
 	s := checkSocket(L)
-	n := L.CheckInt(2)
-	buf := make([]byte, n)
+	l := L.CheckInt(2)
+	buf := make([]byte, l)
 	s.conn.SetReadDeadline(time.Now().Add(s.timeout))
-	_, err := s.conn.Read(buf)
+	n, err := s.conn.Read(buf)
+	L.Push(lua.LString(string(buf[:n])))
 	if err != nil {
-		L.Push(lua.LNil)
 		L.Push(lua.LString(err.Error()))
 		return 2
 	}
-	L.Push(lua.LString(string(buf)))
 	return 1
 }
 

@@ -22,10 +22,10 @@ func main() {
 	L.PreloadModule("socket", gluasocket.Loader)
 	err := L.DoString(
 		`socket=require("socket")
-		s=socket.new('tcp')
+		s=socket.new("tcp")
 		s:settimeout(5)
-		ok, err = s:connect("www.example.com",80)
-		if ok
+		err = s:connect("www.example.com",80)
+		if err==nil
 		then
 			s:send("GET /\r\n\r\n")
 			x=s:readn(40)
@@ -36,8 +36,7 @@ func main() {
 			s:close()
 		else
 			print(err)
-		end
-		`,
+		end`,
 	)
 	if err != nil {
 		fmt.Println(err)
