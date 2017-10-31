@@ -6,8 +6,13 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/Greyh4t/dnscache"
 	"github.com/yuin/gopher-lua"
 )
+
+type socketModule struct {
+	resolver *dnscache.Resolver
+}
 
 type Socket struct {
 	t       string
@@ -15,23 +20,29 @@ type Socket struct {
 	conn    net.Conn
 }
 
-func Loader(L *lua.LState) int {
+func NewSocketModule(resolver *dnscache.Resolver) *socketModule {
+	return &socketModule{
+		resolver: resolver,
+	}
+}
+
+func (self *socketModule) Loader(L *lua.LState) int {
 	socket := L.NewTypeMetatable("socket")
 	L.SetGlobal("socket", socket)
-	L.SetField(socket, "new", L.NewFunction(newSocket))
+	L.SetField(socket, "new", L.NewFunction(self.newSocket))
 	L.SetField(socket, "__index", L.SetFuncs(L.NewTable(), map[string]lua.LGFunction{
-		"settimeout": settimeout,
-		"connect":    connect,
-		"send":       send,
-		"read":       read,
-		"readn":      readN,
-		"close":      close,
+		"settimeout": self.settimeout,
+		"connect":    self.connect,
+		"send":       self.send,
+		"read":       self.read,
+		"readn":      self.readN,
+		"close":      self.close,
 	}))
 	L.Push(socket)
 	return 1
 }
 
-func newSocket(L *lua.LState) int {
+func (self *socketModule) newSocket(L *lua.LState) int {
 	t := L.CheckString(1)
 	if t != "tcp" && t != "udp" {
 		L.ArgError(1, "type must be tcp or udp")
@@ -46,7 +57,7 @@ func newSocket(L *lua.LState) int {
 	return 1
 }
 
-func checkSocket(L *lua.LState) *Socket {
+func (self *socketModule) checkSocket(L *lua.LState) *Socket {
 	ud := L.CheckUserData(1)
 	if v, ok := ud.Value.(*Socket); ok {
 		return v
@@ -55,16 +66,27 @@ func checkSocket(L *lua.LState) *Socket {
 	return nil
 }
 
-func settimeout(L *lua.LState) int {
-	s := checkSocket(L)
+func (self *socketModule) settimeout(L *lua.LState) int {
+	s := self.checkSocket(L)
 	s.timeout = time.Duration(L.CheckInt(2)) * time.Second
 	return 0
 }
 
-func connect(L *lua.LState) int {
-	s := checkSocket(L)
-	addr := L.CheckString(2) + ":" + strconv.Itoa(L.CheckInt(3))
-	conn, err := net.DialTimeout(s.t, addr, s.timeout)
+func (self *socketModule) connect(L *lua.LState) int {
+	s := self.checkSocket(L)
+	host := L.CheckString(2)
+	port := strconv.Itoa(L.CheckInt(3))
+
+	if self.resolver != nil {
+		var err error
+		host, err = self.resolver.FetchOneString(host)
+		if err != nil {
+			L.Push(lua.LString(err.Error()))
+			return 1
+		}
+	}
+
+	conn, err := net.DialTimeout(s.t, net.JoinHostPort(host, port), s.timeout)
 	if err != nil {
 		L.Push(lua.LString(err.Error()))
 		return 1
@@ -73,8 +95,8 @@ func connect(L *lua.LState) int {
 	return 0
 }
 
-func send(L *lua.LState) int {
-	s := checkSocket(L)
+func (self *socketModule) send(L *lua.LState) int {
+	s := self.checkSocket(L)
 	s.conn.SetWriteDeadline(time.Now().Add(s.timeout))
 	n, err := s.conn.Write([]byte(L.CheckString(2)))
 	s.conn.SetWriteDeadline(time.Time{})
@@ -86,10 +108,11 @@ func send(L *lua.LState) int {
 	return 1
 }
 
-func read(L *lua.LState) int {
-	s := checkSocket(L)
+func (self *socketModule) read(L *lua.LState) int {
+	s := self.checkSocket(L)
 	s.conn.SetReadDeadline(time.Now().Add(s.timeout))
 	buf, err := ioutil.ReadAll(s.conn)
+	s.conn.SetReadDeadline(time.Time{})
 	L.Push(lua.LString(string(buf)))
 	if err != nil {
 		L.Push(lua.LString(err.Error()))
@@ -98,12 +121,13 @@ func read(L *lua.LState) int {
 	return 1
 }
 
-func readN(L *lua.LState) int {
-	s := checkSocket(L)
+func (self *socketModule) readN(L *lua.LState) int {
+	s := self.checkSocket(L)
 	l := L.CheckInt(2)
 	buf := make([]byte, l)
 	s.conn.SetReadDeadline(time.Now().Add(s.timeout))
 	n, err := s.conn.Read(buf)
+	s.conn.SetReadDeadline(time.Time{})
 	L.Push(lua.LString(string(buf[:n])))
 	if err != nil {
 		L.Push(lua.LString(err.Error()))
@@ -112,8 +136,8 @@ func readN(L *lua.LState) int {
 	return 1
 }
 
-func close(L *lua.LState) int {
-	s := checkSocket(L)
+func (self *socketModule) close(L *lua.LState) int {
+	s := self.checkSocket(L)
 	s.conn.Close()
 	return 0
 }

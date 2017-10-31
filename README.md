@@ -7,7 +7,9 @@ package main
 
 import (
 	"fmt"
+	"time"
 
+	"github.com/Greyh4t/dnscache"
 	"github.com/Greyh4t/gluasocket"
 	"github.com/yuin/gopher-lua"
 )
@@ -19,7 +21,9 @@ func main() {
 			RegistrySize:  512,
 		},
 	)
-	L.PreloadModule("socket", gluasocket.Loader)
+	resolver := dnscache.New(time.Minute * 10)
+	//L.PreloadModule("socket", gluasocket.NewSocketModule(nil).Loader)
+	L.PreloadModule("socket", gluasocket.NewSocketModule(resolver).Loader)
 	err := L.DoString(
 		`socket=require("socket")
 		s=socket.new("tcp")
