@@ -27,10 +27,12 @@ func NewSocketModule(resolver *dnscache.Resolver) *socketModule {
 }
 
 func (self *socketModule) Loader(L *lua.LState) int {
-	socket := L.NewTypeMetatable("socket")
-	L.SetGlobal("socket", socket)
-	L.SetField(socket, "new", L.NewFunction(self.newSocket))
-	L.SetField(socket, "__index", L.SetFuncs(L.NewTable(), map[string]lua.LGFunction{
+	socket := L.SetFuncs(L.NewTable(), map[string]lua.LGFunction{
+		"new": self.newSocket,
+	})
+
+	mt := L.NewTypeMetatable("socket")
+	L.SetField(mt, "__index", L.SetFuncs(L.NewTable(), map[string]lua.LGFunction{
 		"settimeout": self.settimeout,
 		"connect":    self.connect,
 		"send":       self.send,
@@ -38,6 +40,8 @@ func (self *socketModule) Loader(L *lua.LState) int {
 		"readn":      self.readN,
 		"close":      self.close,
 	}))
+	L.SetField(socket, "socket", mt)
+
 	L.Push(socket)
 	return 1
 }
