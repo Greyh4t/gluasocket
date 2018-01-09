@@ -212,6 +212,7 @@ func (self *socketModule) asyncSend(L *lua.LState) int {
 		}
 		close(resultChan)
 	}(s, resultChan)
+
 	return L.Yield(lua.LChannel(resultChan))
 }
 
@@ -229,6 +230,7 @@ func (self *socketModule) asyncRead(L *lua.LState) int {
 		}
 		close(resultChan)
 	}(s, resultChan)
+
 	return L.Yield(lua.LChannel(resultChan))
 }
 
