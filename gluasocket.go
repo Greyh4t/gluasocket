@@ -200,18 +200,19 @@ func (self *socketModule) asyncConnect(L *lua.LState) int {
 
 func (self *socketModule) asyncSend(L *lua.LState) int {
 	s := self.checkSocket(L)
+	data := L.CheckString(2)
 	resultChan := make(chan lua.LValue, 2)
 
-	go func(s *Socket, resultChan chan lua.LValue) {
+	go func(s *Socket, data string, resultChan chan lua.LValue) {
 		s.conn.SetWriteDeadline(time.Now().Add(s.timeout))
-		n, err := s.conn.Write([]byte(L.CheckString(2)))
+		n, err := s.conn.Write([]byte(data))
 		s.conn.SetWriteDeadline(time.Time{})
 		resultChan <- lua.LNumber(n)
 		if err != nil {
 			resultChan <- lua.LString(err.Error())
 		}
 		close(resultChan)
-	}(s, resultChan)
+	}(s, data, resultChan)
 
 	return L.Yield(lua.LChannel(resultChan))
 }
